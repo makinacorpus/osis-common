@@ -32,5 +32,6 @@ setup(
     install_requires=[
           'Django>=1.9',
           'reportlab>=3.2.0',
+          'django-ckeditor==5.0.3',
     ],
 )
