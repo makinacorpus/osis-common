@@ -9,7 +9,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='osis-common',
-    version='0.1',
+    version='0.3',
     packages=find_packages(),
     include_package_data=True,
     license='GNU v3',
@@ -33,5 +33,6 @@ setup(
           'Django>=1.9',
           'reportlab>=3.2.0',
           'django-ckeditor==5.0.3',
+          'XlsxWriter==0.9.3'
     ],
 )
