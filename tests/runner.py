@@ -32,6 +32,20 @@ class InstalledAppsTestRunner(DiscoverRunner):
 
     @override(DiscoverRunner)
     def build_suite(self, test_labels=None, extra_tests=None, **kwargs):
+        if test_labels:
+            if test_labels[0] == 'selenium':
+                print('Unittests + Selenium')
+                test_labels = test_labels[1:]
+            elif test_labels[0] == 'selenium_only':
+                print('Selenium Tests')
+                test_labels = test_labels[1:]
+                self.tags = ['selenium_tests']
+            else:
+                print('Unittests')
+                self.exclude_tags.add('selenium_tests')
+        else:
+            print('Unittests')
+            self.exclude_tags.add('selenium_tests')
         if not test_labels:
             test_labels = settings.APPS_TO_TEST
         return super().build_suite(test_labels=test_labels, extra_tests=extra_tests, **kwargs)
