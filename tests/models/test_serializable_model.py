@@ -79,16 +79,14 @@ class TestSerializeObject(TestCase):
         result = re.match('[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}', '{}'.format(serializable_model))
         self.assertIsNotNone(result)
 
-
-class TestMessageQueueCache(TestCase):
-    def test_message_queue_cache_no_insert(self):
-        if hasattr(settings, 'QUEUES') and settings.QUEUES:
+if hasattr(settings, 'QUEUES') and settings.QUEUES:
+    class TestMessageQueueCache(TestCase):
+        def test_message_queue_cache_no_insert(self):
             ModelWithoutUser.objects.create(name='Dummy')
             message_queued = message_queue_cache.get_messages_to_retry()
             self.assertEqual(0, message_queued.count())
 
-    def test_message_queue_cache_insert(self):
-        if hasattr(settings, 'QUEUES') and settings.QUEUES:
+        def test_message_queue_cache_insert(self):
             queue_settings = deepcopy(settings.QUEUES)
             queue_settings['QUEUE_URL'] = "dummy-url"
             with override_settings(QUEUES=queue_settings):
@@ -96,8 +94,7 @@ class TestMessageQueueCache(TestCase):
                 message_queued = message_queue_cache.get_messages_to_retry()
                 self.assertEqual(1, message_queued.count())
 
-    def test_message_queue_cache_order(self):
-        if hasattr(settings, 'QUEUES') and settings.QUEUES:
+        def test_message_queue_cache_order(self):
             queue_settings = deepcopy(settings.QUEUES)
             queue_settings['QUEUE_URL'] = "dummy-url"
             with override_settings(QUEUES=queue_settings):
@@ -113,8 +110,7 @@ class TestMessageQueueCache(TestCase):
                 self.assertEqual(user_3.id, latest_message.get('id'))
                 self.assertEqual(str(user_3.uuid), latest_message.get('uuid'))
 
-    def test_save_after_seed_message_queue_cache(self):
-        if hasattr(settings, 'QUEUES') and settings.QUEUES:
+        def test_save_after_seed_message_queue_cache(self):
             queue_name = settings.QUEUES.get('QUEUES_NAME').get('MIGRATIONS_TO_PRODUCE')
             queue_settings = deepcopy(settings.QUEUES)
             queue_settings['QUEUE_URL'] = "dummy-url"
@@ -127,8 +123,7 @@ class TestMessageQueueCache(TestCase):
                 ModelWithoutUser.objects.create(name='Dummy')
                 self.assertEqual(4, message_queue_cache.get_messages_to_retry().count())
 
-    def test_save_after_seed_message_queue_cache(self):
-        if hasattr(settings, 'QUEUES') and settings.QUEUES:
+        def test_save_after_seed_message_queue_cache(self):
             queue_name = settings.QUEUES.get('QUEUES_NAME').get('MIGRATIONS_TO_PRODUCE')
             # Seed message queue cache database
             message_queue_cache.MessageQueueCache.objects.create(queue=queue_name, data={'body':{'model': 'test_1', 'fields': {'test': True}}})
