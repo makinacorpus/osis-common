@@ -35,22 +35,30 @@ class InstalledAppsTestRunner(DiscoverRunner):
     @override(DiscoverRunner)
     def build_suite(self, test_labels=None, extra_tests=None, **kwargs):
         django_version = get_django_version()
+        run_with_tag = False
+        tests_type = 'Unit Tests Only'
         if LooseVersion(django_version) >= LooseVersion("1.10"):
+            run_with_tag = True
             if test_labels:
                 if test_labels[0] == 'selenium':
-                    print('Unittests + Selenium')
+                    tests_type = 'Unit Tests + Selenium Tests'
                     test_labels = test_labels[1:]
                 elif test_labels[0] == 'selenium_only':
-                    print('Selenium Tests')
+                    tests_type = 'Selenium Tests Only'
                     test_labels = test_labels[1:]
-                    self.tags = ['selenium_tests']
+                    self.tags = ['selenium']
                 else:
-                    print('Unittests')
-                    self.exclude_tags.add('selenium_tests')
+                    self.exclude_tags.add('selenium')
             else:
-                print('Unittests')
-                self.exclude_tags.add('selenium_tests')
+                self.exclude_tags.add('selenium')
         if not test_labels:
             test_labels = settings.APPS_TO_TEST
+        print('###### Tests Infos #####################################')
+        print('### Test Runner : {}'.format(settings.TEST_RUNNER))
+        print('### Django Version : {}'.format(django_version))
+        print('### Run with tag : {}'.format(run_with_tag))
+        print('### Tests type: {}'.format(tests_type))
+        print('########################################################')
+        print('')
         return super().build_suite(test_labels=test_labels, extra_tests=extra_tests, **kwargs)
 
