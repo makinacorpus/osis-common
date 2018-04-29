@@ -32,7 +32,7 @@ import time
 from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import models
+from django.db import models, transaction
 from django.db.models import DateTimeField, DateField
 from django.core import serializers
 from django.utils.encoding import force_text
@@ -77,7 +77,7 @@ def serializable_model_resend_messages_to_queue(self, request, queryset):
         queue_name = settings.QUEUES.get('QUEUES_NAME').get('MIGRATIONS_TO_PRODUCE')
         for record in queryset:
             try:
-                ser_obj = serialize(record)
+                ser_obj = serialize(record, False)
                 queue_sender.send_message(queue_name,
                                           wrap_serialization(ser_obj))
                 counter += 1
@@ -99,11 +99,13 @@ class SerializableModel(models.Model):
 
     def save(self, *args, **kwargs):
         super(SerializableModel, self).save(*args, **kwargs)
-        serializable_model_post_save(self)
+        # Send message to queue only when transaction is commited
+        transaction.on_commit(lambda: serializable_model_post_save(self))
 
     def delete(self, *args, **kwargs):
         result = super(SerializableModel, self).delete(*args, **kwargs)
-        serializable_model_post_delete(self)
+        # Send message to queue only when transaction is commited
+        transaction.on_commit(lambda: serializable_model_post_delete(self, to_delete=True))
         return result
 
     def natural_key(self):
@@ -129,22 +131,22 @@ def serializable_model_post_save(instance):
     serializable_model_post_change(instance)
 
 
-def serializable_model_post_delete(instance):
+def serializable_model_post_delete(instance, to_delete=False):
     # This function is called in the delete() method of SerializableModel and AuditableSerializableModel
     # Any change made here will be applied to all models inheriting SerializableModel or AuditableSerializableModel
-    serializable_model_post_change(instance)
+    serializable_model_post_change(instance, to_delete)
 
 
-def serializable_model_post_change(instance):
+def serializable_model_post_change(instance, to_delete=False):
     # This function is called in the save() and delete() methods of SerializableModel and AuditableSerializableModel
     # Any change made here will be applied to all models inheriting SerializableModel or AuditableSerializableModel
     if hasattr(settings, 'QUEUES') and settings.QUEUES:
-        send_to_queue(instance)
+        send_to_queue(instance, to_delete)
 
 
 def send_to_queue(instance, to_delete=False):
     queue_name = settings.QUEUES.get('QUEUES_NAME').get('MIGRATIONS_TO_PRODUCE')
-    serialized_instance = wrap_serialization(serialize(instance), to_delete)
+    serialized_instance = wrap_serialization(serialize(instance, to_delete), to_delete)
 
     try:
         # Try to resend message present in cache
@@ -191,15 +193,22 @@ def serialize_objects(objects, format='json'):
                                  use_natural_primary_keys=True)
 
 
-def serialize(obj, last_syncs=None):
+# TODO :: If record is to delete, we don't need to send the entire object, only the UUID is necessary to send.
+# TODO :: This need to correct the algorithm to consume messages.
+def serialize(obj, to_delete, last_syncs=None):
     if obj:
         fields = {}
         for f in obj.__class__._meta.fields:
-            attribute = getattr(obj, f.name)
-            if f.is_relation:
+            if f.is_relation and to_delete:
+                # If record is to delete, it's not necessary to find trough fk field values
+                # (cf. todo above to clean this code)
+                attribute = None
+            else:
+                attribute = getattr(obj, f.name)
+            if f.is_relation and not to_delete:
                 try:
                     if attribute and getattr(attribute, 'uuid'):
-                        fields[f.name] = serialize(attribute, last_syncs=last_syncs)
+                        fields[f.name] = serialize(attribute, to_delete, last_syncs=last_syncs)
                 except AttributeError:
                     pass
             else:
@@ -251,7 +260,7 @@ def persist(structure):
         query_set = model_class.objects.filter(uuid=fields.get('uuid'))
         persisted_obj = query_set.first()
         if not persisted_obj:
-            obj_id = _make_insert(fields, model_class)
+            obj_id = _make_insert(fields, model_class.__bases__[0], model_class)
             if obj_id:
                 return obj_id
             else:
@@ -292,11 +301,11 @@ def _make_update(fields, model_class, persisted_obj, query_set):
     return persisted_obj.id
 
 
-def _make_insert(fields, model_class):
+def _make_insert(fields, super_class, model_class):
     kwargs = _build_kwargs(fields, model_class)
     del kwargs['id']
     obj = model_class(**kwargs)
-    super(SerializableModel, obj).save(force_insert=True)
+    super(super_class, obj).save(force_insert=True)
     obj_id = obj.id
     return obj_id
 

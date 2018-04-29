@@ -23,48 +23,16 @@
 #    see http://www.gnu.org/licenses/.
 #
 ##############################################################################
-import datetime
+from django.test import TestCase
 
-from django.conf import settings
-from django.utils import timezone
-
-
-def get_tzinfo():
-    if settings.USE_TZ:
-        return timezone.get_current_timezone()
-    return None
+from osis_common.utils.enumerations import ChoiceEnum
 
 
-def is_in_chronological_order(date_low, date_high, accept_equality=True):
-    date_low = _get_date_instance(date_low)
-    date_high = _get_date_instance(date_high)
-    if accept_equality:
-        return date_low <= date_high
-    else:
-        return date_low < date_high
+class TestEnumerations(TestCase):
 
+    def test_choice_enum(self):
+        class Enum(ChoiceEnum):
+            TEST = 'TESTE'
 
-def _get_date_instance(date):
-    if not (isinstance(date, datetime.date)):
-        raise TypeError("Arguments should be datetime.datetime or datetime.date")
-    return date.date() if isinstance(date, datetime.datetime) else date
-
-
-def convert_date_to_datetime(value):
-    if isinstance(value, datetime.datetime):
-        return value
-    elif isinstance(value, datetime.date):
-        return datetime.datetime(value.year, value.month, value.day, tzinfo=get_tzinfo())
-    else:
-        return value
-
-
-def convert_datetime_to_date(value):
-    if isinstance(value, datetime.datetime):
-        if value.tzinfo:
-            value = timezone.localtime(value, get_tzinfo())
-        return datetime.date(value.year, value.month, value.day)
-    else:
-        return value
-
+        self.assertEquals(Enum.choices()[0], (Enum.TEST.value, Enum.TEST.value))
 
